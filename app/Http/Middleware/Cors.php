@@ -13,6 +13,12 @@ class Cors
         // Get the origin from the request
         $origin = $request->headers->get('Origin');
         
+        // If no origin header (server-to-server request from proxy), skip CORS
+        // The proxy handles same-origin requests, so CORS doesn't apply
+        if (!$origin) {
+            return $next($request);
+        }
+        
         // Get allowed origins from config
         $allowedOrigins = $this->getAllowedOrigins();
         
@@ -37,8 +43,8 @@ class Cors
 
         $response = $next($request);
 
-        // Set CORS headers
-        if ($allowedOrigin) {
+        // Set CORS headers only if origin was present (direct browser requests)
+        if ($allowedOrigin && $origin) {
             $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
             $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
             $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
@@ -78,9 +84,12 @@ class Cors
      */
     private function getAllowedOrigin(?string $requestOrigin, array $allowedOrigins): ?string
     {
-        // If no origin in request (same-origin), return first allowed origin
+        // If no origin in request (same-origin or server-to-server), allow it
+        // This handles requests from Next.js proxy (server-to-server) or same-origin requests
         if (!$requestOrigin) {
-            return !empty($allowedOrigins) ? reset($allowedOrigins) : null;
+            // For server-to-server requests (like from Next.js proxy), allow all
+            // Or return first allowed origin as fallback
+            return !empty($allowedOrigins) ? reset($allowedOrigins) : '*';
         }
 
         // Check if request origin is in allowed list (exact match required for credentials)
