@@ -35,4 +35,27 @@ return [
         ],
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI'),
+    ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+    ],
+
+    'lemon_squeezy' => [
+        'api_key' => env('LEMON_SQUEEZY_API_KEY'),
+        'webhook_secret' => env('LEMON_SQUEEZY_WEBHOOK_SECRET'),
+        'store_id' => env('LEMON_SQUEEZY_STORE_ID'),
+    ],
+
+    'smtp' => [
+        'host' => env('SMTP_HOST'),
+        'port' => env('SMTP_PORT'),
+        'user' => env('SMTP_USER'),
+        'password' => env('SMTP_PASSWORD'),
+    ],
+
 ];
