@@ -6,6 +6,15 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AIController;
 use Illuminate\Support\Facades\Route;
 
+// Health check route (for testing)
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'API is working',
+        'timestamp' => now()->toIso8601String(),
+    ]);
+});
+
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);

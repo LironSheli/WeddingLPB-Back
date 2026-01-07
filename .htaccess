@@ -3,6 +3,18 @@ RewriteEngine On
 
 # Allow Installatron requests
 RewriteCond %{REQUEST_FILENAME} deleteme\.\w+\.php
-RewriteRule (.*) - [L] 
+RewriteRule (.*) - [L]
 
-RewriteRule ^ index.php [L]
+# Redirect all requests to public/index.php (Laravel's entry point)
+# This is needed when document root is set to the Laravel root directory
+# instead of the public directory
+
+# Don't rewrite if the request is for a file or directory that exists
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Don't rewrite if already going to public/
+RewriteCond %{REQUEST_URI} !^/public/
+
+# Route everything else to public/index.php
+RewriteRule ^(.*)$ public/index.php [L]

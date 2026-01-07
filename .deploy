@@ -1,0 +1,32 @@
+#!/bin/bash
+# Hostinger Deployment Script
+# This script is executed automatically by Hostinger Git deployment
+
+set -e
+
+echo "Starting deployment..."
+
+# Increase memory limit for composer
+export COMPOSER_MEMORY_LIMIT=-1
+export COMPOSER_PROCESS_TIMEOUT=600
+
+# Install dependencies
+echo "Installing composer dependencies..."
+php -d memory_limit=512M /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist || {
+    echo "Composer install failed, trying with system composer..."
+    php -d memory_limit=512M composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+}
+
+# Run Laravel commands
+if [ -f "artisan" ]; then
+    echo "Running Laravel commands..."
+    php artisan config:clear || true
+    php artisan cache:clear || true
+    php artisan route:clear || true
+    php artisan view:clear || true
+    php artisan config:cache || true
+    php artisan route:cache || true
+fi
+
+echo "Deployment complete!"
+
