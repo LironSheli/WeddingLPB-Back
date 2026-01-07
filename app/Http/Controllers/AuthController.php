@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
@@ -23,9 +24,13 @@ class AuthController extends Controller
             'phone' => $request->phone,
         ]);
 
-        Auth::login($user);
+        $token = JWTAuth::fromUser($user);
 
-        return response()->json(['user' => $user], 201);
+        return response()->json([
+            'user' => $user,
+            'token' => $token,
+            'token_type' => 'bearer',
+        ], 201);
     }
 
     public function login(Request $request)
@@ -35,26 +40,39 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        if (Auth::attempt($request->only('email', 'password'))) {
-            $request->session()->regenerate();
-            return response()->json(['user' => Auth::user()]);
+        $credentials = $request->only('email', 'password');
+
+        if (!$token = Auth::guard('api')->attempt($credentials)) {
+            return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        return response()->json(['message' => 'Invalid credentials'], 401);
+        return response()->json([
+            'user' => Auth::guard('api')->user(),
+            'token' => $token,
+            'token_type' => 'bearer',
+        ]);
     }
 
     public function logout(Request $request)
     {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        Auth::guard('api')->logout();
 
-        return response()->json(['message' => 'Logged out']);
+        return response()->json(['message' => 'Logged out successfully']);
     }
 
     public function user(Request $request)
     {
         return response()->json($request->user());
+    }
+
+    public function refresh()
+    {
+        $token = Auth::guard('api')->refresh();
+
+        return response()->json([
+            'token' => $token,
+            'token_type' => 'bearer',
+        ]);
     }
 
     public function redirectToGoogle()
@@ -78,9 +96,9 @@ class AuthController extends Controller
                 $user->update(['google_id' => $googleUser->id]);
             }
 
-            Auth::login($user);
+            $token = JWTAuth::fromUser($user);
 
-            return redirect(config('app.frontend_url', 'http://localhost:3000') . '/dashboard');
+            return redirect(config('app.frontend_url', 'http://localhost:3000') . '/dashboard?token=' . $token);
         } catch (\Exception $e) {
             return redirect(config('app.frontend_url', 'http://localhost:3000') . '/login?error=google_auth_failed');
         }
