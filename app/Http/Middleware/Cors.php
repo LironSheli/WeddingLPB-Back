@@ -13,25 +13,31 @@ class Cors
         // Get the origin from the request
         $origin = $request->headers->get('Origin');
         
-        // Get allowed origins from config (can be comma-separated or single value)
+        // Get allowed origins from config
         $allowedOrigins = $this->getAllowedOrigins();
         
         // Determine which origin to allow
+        // When using credentials, we MUST return the exact origin from the request if it's allowed
         $allowedOrigin = $this->getAllowedOrigin($origin, $allowedOrigins);
         
         // Handle preflight OPTIONS request
         if ($request->isMethod('OPTIONS')) {
-            return response('', 200)
-                ->header('Access-Control-Allow-Origin', $allowedOrigin)
-                ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
-                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin')
-                ->header('Access-Control-Allow-Credentials', 'true')
-                ->header('Access-Control-Max-Age', '86400');
+            $response = response('', 200);
+            
+            if ($allowedOrigin) {
+                $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
+                $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+                $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+                $response->headers->set('Access-Control-Allow-Credentials', 'true');
+                $response->headers->set('Access-Control-Max-Age', '86400');
+            }
+            
+            return $response;
         }
 
         $response = $next($request);
 
-        // Only set CORS headers if we have an allowed origin
+        // Set CORS headers
         if ($allowedOrigin) {
             $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
             $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
@@ -53,37 +59,52 @@ class Cors
         $origins = explode(',', $frontendUrl);
         
         // Trim whitespace and filter empty values
-        return array_filter(array_map('trim', $origins));
+        $origins = array_filter(array_map('trim', $origins));
+        
+        // In development, also allow common localhost variations
+        if (config('app.env') === 'local' || config('app.debug')) {
+            $origins[] = 'http://localhost:3000';
+            $origins[] = 'http://127.0.0.1:3000';
+            $origins[] = 'http://localhost';
+            $origins[] = 'http://127.0.0.1';
+        }
+        
+        return array_unique($origins);
     }
 
     /**
      * Determine which origin to allow based on request origin
+     * When using credentials, we MUST return the exact origin from the request
      */
     private function getAllowedOrigin(?string $requestOrigin, array $allowedOrigins): ?string
     {
-        // If no origin in request, use first allowed origin (for same-origin requests)
+        // If no origin in request (same-origin), return first allowed origin
         if (!$requestOrigin) {
             return !empty($allowedOrigins) ? reset($allowedOrigins) : null;
         }
 
-        // Check if request origin is in allowed list
+        // Check if request origin is in allowed list (exact match required for credentials)
         foreach ($allowedOrigins as $allowed) {
-            // Exact match
             if ($requestOrigin === $allowed) {
+                // Return the exact origin from the request (required for credentials)
                 return $requestOrigin;
-            }
-            
-            // Support wildcard subdomains (e.g., *.example.com)
-            if (strpos($allowed, '*') !== false) {
-                $pattern = '/^' . str_replace(['*', '.'], ['.*', '\.'], $allowed) . '$/';
-                if (preg_match($pattern, $requestOrigin)) {
-                    return $requestOrigin;
-                }
             }
         }
 
-        // If origin doesn't match, return first allowed origin (fallback)
-        // In production, you might want to return null to reject unauthorized origins
+        // In development, be more permissive
+        if (config('app.env') === 'local' || config('app.debug')) {
+            // Allow localhost variations
+            if (preg_match('/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/', $requestOrigin)) {
+                return $requestOrigin;
+            }
+        }
+
+        // If origin doesn't match and we're in production, return null to reject
+        // Otherwise, return first allowed origin as fallback
+        if (config('app.env') === 'production') {
+            return null;
+        }
+
         return !empty($allowedOrigins) ? reset($allowedOrigins) : null;
     }
 }
